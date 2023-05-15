@@ -1,0 +1,352 @@
+---
+title: "Homework_BACS10"
+author: "109090035, helped by 109070022,109060082"
+date: "4/19/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      comment = "", 
+                      dev.args = list(                                       pointsize = 11))
+library(FSA)
+library(car)
+library(skimr)
+library(psych)
+library(kableExtra)
+library(tidyverse)
+library(dplyr)
+library(magrittr)
+library(Ecdat)
+library(gapminder)
+library(nycflights13)
+
+ptable = function(df,digits = getOption("digits"),size = 14){
+  df %>% knitr::kable(digits = digits) %>% 
+    kable_classic(lightable_options = c("striped", "hover", "condensed"),
+                  fixed_thead = list(enabled = T, 
+                                     background = "lavender"),
+                  font_size = size, full_width = F,
+                  html_font = "helvetica")
+}
+```
+
+
+
+### Question 1) We will use the interactive_regression() function from CompStatsLib again – Windows users please make sure your desktop scaling is set to 100% and RStudio zoom is 100%;  alternatively, run R from the Windows Command Prompt.
+
+### To answer the questions below, understand each of these four scenarios by simulating them:
+
+### Scenario 1: Consider a very narrowly dispersed set of points that have a negative or positive steep slope
+### Scenario 2: Consider a widely dispersed set of points that have a negative or positive steep slope
+### Scenario 3: Consider a very narrowly dispersed set of points that have a negative or positive shallow slope
+### Scenario 4: Consider a widely dispersed set of points that have a negative or positive shallow slope
+
+
+
+```{r}
+knitr::include_graphics("/Users/user/Desktop/hw10.png")
+```
+
+### a. Comparing scenarios 1 and 2, which do we expect to have a stronger R2 ?
+
+We expect Scenario 1 to have a stronger R2, because the points are more narrowly dispersed around the regression line, indicating a stronger relationship between the independent and dependent variables.
+
+### b. Comparing scenarios 3 and 4, which do we expect to have a stronger R2 ?
+
+We expect Scenario 3 to have a stronger R2 for the same reason as in the comparison between scenarios 1 and 2. The narrower dispersion of points around the regression line in Scenario 3 indicates a stronger relationship between the variables.
+
+
+### c. Comparing scenarios 1 and 2, which do we expect has bigger/smaller SSE, SSR, and SST? (intuitively)
+
+SSE (Sum of Squared Errors): Scenario 2 would have a bigger SSE because the points are more widely dispersed from the regression line, leading to larger residuals.
+
+SSR (Sum of Squares due to Regression): Scenario 1 would have a bigger SSR, as the points are more tightly clustered around the regression line, indicating that more of the total
+variation is accounted for by the regression.
+
+SST (Total Sum of Squares): Scenarios 1 and 2 may have similar SST values, as the dispersion around the regression line is the main difference between the scenarios rather than the overall range of the dependent variable.
+
+
+### d. Comparing scenarios 3 and 4, which do we expect has bigger/smaller SSE, SSR, and SST? (intuitively)
+
+SSE (Sum of Squared Errors): Scenario 4 would have a bigger SSE because the points are more widely dispersed from the regression line, leading to larger residuals.
+
+SSR (Sum of Squares due to Regression): Scenario 3 would have a bigger SSR, as the points are more tightly clustered around the regression line, indicating that more of the total variation is accounted for by the regression.
+
+SST (Total Sum of Squares): Similar to the comparison between scenarios 1 and 2, scenarios 3 and 4 may have similar SST values, as the dispersion around the regression line is the main difference between the scenarios rather than the overall range of the dependent variable.
+
+### Question 2) Let’s analzye the programmer_salaries.txt dataset we saw in class. Read the file using read.csv("programmer_salaries.txt", sep="\t") because the columns are separated by tabs (\t).
+
+```{r}
+programmer_salaries <- read.csv("/Users/user/Downloads/programmer_salaries.txt", sep="\t")
+```
+
+### a. Use the lm() function to estimate the regression model Salary ~ Experience + Score + Degree Show the beta coefficients, R2, and the first 5 values of y  ($fitted.values) and  ($residuals)
+
+```{r}
+# Estimate the regression model
+model <- lm(Salary ~ Experience + Score + Degree, data = programmer_salaries)
+
+# Show the beta coefficients
+print(coef(model))
+
+# Show R-squared
+cat("R-squared:", summary(model)$r.squared, "\n")
+
+# Show the first 5 values of y (fitted.values) and (residuals)
+cat("First 5 Fitted Values (y):\n")
+print(head(model$fitted.values, 5))
+
+cat("First 5 Residuals:\n")
+print(head(model$residuals, 5))
+
+```
+
+### b. Use only linear algebra and the geometric view of regression to estimate the regression yourself:
+
+### i. Create an X matrix that has a first column of 1s followed by columns of the independent variables(only show the code)
+
+```{r}
+X <- cbind(1, programmer_salaries$Experience, programmer_salaries$Score, programmer_salaries$Degree)
+head(X)
+```
+
+### ii. Create a y vector with the Salary values (only show the code)
+
+```{r}
+y <- programmer_salaries$Salary
+y
+```
+
+### iii. Compute the beta_hat vector of estimated regression coefficients (show the code and values)
+
+```{r}
+beta_hat <- solve(t(X) %*% X) %*% t(X) %*% y
+print(beta_hat)
+```
+
+### iv. Compute a y_hat vector of estimated y values, and a res vector of residuals (show the code and the first 5 values of y_hat and res)
+
+```{r}
+y_hat <- X %*% beta_hat
+res <- y - y_hat
+cat("First 5 values of y_hat:\n")
+print(head(y_hat, 5))
+cat("First 5 values of res:\n")
+print(head(res, 5))
+```
+
+### v. Using only the results from (i) – (iv), compute SSR, SSE and SST (show the code and values)
+
+```{r}
+SSE <- sum(res^2)
+SSR <- sum((y_hat - mean(y))^2)
+SST <- sum((y - mean(y))^2)
+cat("SSE:", SSE, "\n")
+cat("SSR:", SSR, "\n")
+cat("SST:", SST, "\n")
+```
+
+### c. Compute R2 for in two ways, and confirm you get the same results (show code and values):
+
+### i. Use any combination of SSR, SSE, and SST
+
+```{r}
+R2_1 <- SSR / SST
+cat("R-squared using SSR and SST:", R2_1, "\n")
+```
+
+### ii. Use the squared correlation of vectors y and y
+
+```{r}
+R2_2 <- cor(y, y_hat)^2
+cat("R-squared using squared correlation of y and y_hat:", R2_2, "\n")
+```
+
+### Question 3) We’re going to take a look back at the early heady days of global car manufacturing, when American, Japanese, and European cars competed to rule the world. Take a look at the data set in file auto-data.txt. We are interested in explaining what kind of cars have higher fuel efficiency (mpg).
+
+```{r}
+auto <- read.table("/Users/user/Downloads/auto-data.txt", header=FALSE, na.strings = "?")
+names(auto) <- c("mpg", "cylinders", "displacement", "horsepower", "weight", 
+                 "acceleration", "model_year", "origin", "car_name")
+head(auto)
+```
+
+### a. Let’s first try exploring this data and problem:
+
+### i. Visualize the data as you wish (report only relevant/interesting plots)
+
+```{r}
+par(mfrow=c(2, 2)) # Set up a 2x2 plotting grid
+plot(auto$mpg, auto$displacement, main="MPG vs Displacement", xlab="Displacement", ylab="MPG")
+plot(auto$mpg, auto$horsepower, main="MPG vs Horsepower", xlab="Horsepower", ylab="MPG")
+plot(auto$mpg, auto$weight, main="MPG vs Weight", xlab="Weight", ylab="MPG")
+plot(auto$mpg, auto$acceleration, main="MPG vs Acceleration", xlab="Acceleration", ylab="MPG")
+
+```
+
+### ii. Report a correlation table of all variables, rounding to two decimal places(in the cor() function, set use="pairwise.complete.obs" to handle missing values)
+
+```{r}
+# Remove rows with missing values
+auto_clean <- na.omit(auto)
+
+cor_table <- cor(auto_clean[,-9], use="pairwise.complete.obs")
+round(cor_table, 2)
+```
+### iii. From the visualizations and correlations, which variables appear to relate to mpg?
+
+cylinders, Displacement, horsepower, and weight seem to have strong negative correlations with mpg. The model_year and origin also have positive correlations with mpg, but these are weaker relationships.
+
+### iv. Which relationships might not be linear? (don’t worry about linearity for rest of this HW)
+
+
+we can create scatterplots for mpg and all the continuous variables, and fit non-linear curves using loess to visually assess linearity.
+
+```{r}
+# Create a ggplot scatterplot for each variable with a non-linear curve using geom_smooth()
+ggplot(auto_clean, aes(x=displacement, y=mpg)) + geom_point() + geom_smooth(method="loess", se=FALSE, color="red") + labs(title="MPG vs Displacement", x="Displacement", y="MPG")
+ggplot(auto_clean, aes(x=horsepower, y=mpg)) + geom_point() + geom_smooth(method="loess", se=FALSE, color="red") + labs(title="MPG vs Horsepower", x="Horsepower", y="MPG")
+ggplot(auto_clean, aes(x=weight, y=mpg)) + geom_point() + geom_smooth(method="loess", se=FALSE, color="red") + labs(title="MPG vs Weight", x="Weight", y="MPG")
+ggplot(auto_clean, aes(x=acceleration, y=mpg)) + geom_point() + geom_smooth(method="loess", se=FALSE, color="red") + labs(title="MPG vs Acceleration", x="Acceleration", y="MPG")
+
+```
+
+We use loess method to generate the plot examine if the plots were linear, If the curve deviates significantly from a straight line, it might indicate a non-linear relationship between the variables.Hence we can see for four continuous variables in the data we can see Horsepower and Acceleration might not be linear. 
+
+### v. Are there any pairs of independent variables that are highly correlated (r > 0.7)?
+
+Yes, there are several pairs of independent variables that are highly correlated:
+
+Displacement and cylinders (0.95)
+Displacement and weight (0.93)
+Displacement and horsepower (0.90)
+Weight and cylinders (0.90)
+Weight and horsepower (0.86)
+
+These high correlations suggest that multi-collinearity could be an issue when building a linear regression model with these independent variables.
+
+### b. Let’s create a linear regression model where mpg is dependent upon all other suitable variables (Note: origin is categorical with three levels, so use factor(origin) in lm(...)  to split it into two dummy variables)
+
+### i. Which independent variables have a ‘significant’ relationship with mpg at 1% significance?
+
+```{r}
+# Create the linear regression model
+model <- lm(mpg ~ cylinders + displacement + horsepower + weight + acceleration + model_year + factor(origin), data=auto_clean)
+
+# Display the model summary
+summary(model)
+
+```
+The following independent variables have a significant relationship with mpg at the 1% significance level:
+
+1.displacement (p-value = 0.00186, **)
+2.weight (p-value < 2e-16, ***)
+3.model_year (p-value < 2e-16, ***)
+4.factor(origin)2 (p-value = 4.72e-06, ***)
+5.factor(origin)3 (p-value = 3.93e-07, ***)
+
+### ii. Looking at the coefficients, is it possible to determine which independent variables are the most effective at increasing mpg? If so, which ones, and if not, why not? (hint: units!)
+
+To determine which independent variables are the most effective at increasing mpg, it is not enough to just look at the coefficients. The coefficients represent the average change in mpg per unit increase of the respective independent variable, but these variables have different units and scales. 
+
+To compare the importance of these variables, we could either standardize the variables before running the regression or compute the standardized coefficients (also known as beta coefficients) from the original model.
+
+```{r}
+auto_clean_std <- auto_clean
+#Standardizing the variables before running the regression
+auto_clean_std[, c("cylinders", "displacement", "horsepower", "weight", "acceleration", "model_year")] <- scale(auto_clean[, c("cylinders", "displacement", "horsepower", "weight", "acceleration", "model_year")])
+
+# Create the linear regression model with standardized variables
+model_std <- lm(mpg ~ cylinders + displacement + horsepower + weight + acceleration + model_year + factor(origin), data=auto_clean_std)
+
+# Display the model summary
+summary(model_std)
+
+```
+
+Using the standardized model, you can compare the coefficients to determine which independent variables are the most effective at increasing mpg. The larger the absolute value of the standardized coefficient, the more important the variable is in predicting mpg. Based on the standardized coefficients, the most effective variables at increasing mpg are:
+
+1.weight (coefficient = -5.6998)
+2.model_year (coefficient = 2.8624)
+
+A negative coefficient means that the variable is inversely related to mpg. So, as the weight of the car decreases, the mpg increases. On the other hand, as the model year increases, the mpg also increases.
+
+### c. Let’s try to resolve some of the issues with our regression model above.
+
+### i. Create fully standardized regression results: are these slopes easier to compare?(note: consider if you should standardize origin)
+
+In the below example I have already created a fully standardized regression model in previous analysis. Here are the standardized coefficients again:
+
+cylinders: -0.8353
+displacement: 2.5092
+horsepower: -0.6999
+weight: -5.6998
+acceleration: 0.2182
+model_year: 2.8624
+factor(origin)2: 2.6300
+factor(origin)3: 2.8532
+
+These standardized slopes are indeed easier to compare since they are now in the same units.
+
+
+### ii. Regress mpg over each nonsignificant independent variable, individually.Which ones become significant when we regress mpg over them individually?
+
+Regress mpg over each nonsignificant independent variable, individually:
+
+```{r}
+
+# Cylinders
+
+cylinders_regr <- lm(mpg ~ cylinders, data = auto_clean)
+summary(cylinders_regr)
+
+# Horsepower:
+
+horsepower_regr <- lm(mpg ~ horsepower, data = auto_clean)
+summary(horsepower_regr)
+
+# Acceleration:
+
+acceleration_regr <- lm(mpg ~ acceleration, data = auto_clean)
+summary(acceleration_regr)
+
+
+```
+
+Based on the results for the individual regressions:
+
+1. Cylinders:
+The relationship between mpg and cylinders is significant (p-value < 2.2e-16).
+
+2. Horsepower:
+The relationship between mpg and horsepower is significant (p-value < 2.2e-16).
+
+3. Acceleration:
+The relationship between mpg and acceleration is significant (p-value < 2.2e-16).
+
+When regressed individually, all the non-significant independent variables from the previous multiple linear regression model become significant in their relationship with mpg.
+
+
+
+
+
+
+
+### iii. Plot the distribution of the residuals: are they normally distributed and centered around zero?(get the residuals of a fitted linear model, e.g. regr <- lm(...), using regr$residuals
+
+```{r}
+
+regr <- lm(mpg ~ cylinders + displacement + horsepower + weight + acceleration + model_year + factor(origin), data = auto_clean)
+residuals_df <- data.frame(residuals = regr$residuals)
+
+ggplot(residuals_df, aes(x = residuals)) +
+  geom_histogram(aes(y = ..density..), bins = 30, fill = "blue", alpha = 0.6) +
+  geom_density(color = "red", size = 1) +
+  theme_minimal() +
+  labs(title = "Distribution of Residuals", x = "Residuals", y = "Density")
+
+```
+
+We can see the distribution of residuals are normally distributed and centered around zero.
+

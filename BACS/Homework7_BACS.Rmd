@@ -1,0 +1,272 @@
+---
+title: "Homework7_BACS"
+author: "109090035 helped by 109090046 109070028"
+date: "3/29/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      comment = "", 
+                      dev.args = list(                                       pointsize = 11))
+library(FSA)
+library(car)
+library(skimr)
+library(psych)
+library(kableExtra)
+library(tidyverse)
+library(dplyr)
+library(magrittr)
+library(Ecdat)
+library(gapminder)
+library(nycflights13)
+
+ptable = function(df,digits = getOption("digits"),size = 14){
+  df %>% knitr::kable(digits = digits) %>% 
+    kable_classic(lightable_options = c("striped", "hover", "condensed"),
+                  fixed_thead = list(enabled = T, 
+                                     background = "lavender"),
+                  font_size = size, full_width = F,
+                  html_font = "helvetica")
+}
+```
+
+### Question 1)  Let’s explore and describe the data and develop some early intuitive thoughts:
+
+### a. What are the means of viewers’ intentions to share (INTEND.0) on each of the four media types?
+
+```{r}
+media1 <- read_csv("/Users/user/Downloads/pls-media/pls-media1.csv")
+media2 <- read_csv("/Users/user/Downloads/pls-media/pls-media2.csv")
+media3 <- read_csv("/Users/user/Downloads/pls-media/pls-media3.csv")
+media4 <- read_csv("/Users/user/Downloads/pls-media/pls-media4.csv")
+```
+lets add a media type column 
+```{r}
+media1$media_type <- "1 - Video (Animation + Audio)"
+media2$media_type <- "2 - Video (Pictures + Audio)"
+media3$media_type <- "3 - Webpage (Pictures + Text)"
+media4$media_type <- "4 - Webpage (Text Only)"
+```
+
+Combine the data and calculate the means for each media type
+```{r}
+combined_data <- rbind(media1, media2, media3, media4)
+
+mean_intentions <- combined_data %>% group_by(media_type) %>% summarise(mean_intention = mean(INTEND.0, na.rm = TRUE))
+
+mean_intentions %>% ptable()
+```
+
+
+### b. Visualize the distribution and mean of intention to share, across all four media.
+
+```{r}
+ggplot(combined_data, aes(x = INTEND.0, fill = media_type)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(data = mean_intentions, aes(xintercept = mean_intention, color = media_type), linetype = "dashed") +
+  labs(title = "Distribution and Mean of Intention to Share by Media Type",
+       x = "Intention to Share (1-7)",
+       y = "Density",
+       fill = "Media Type",
+       color = "Mean") +
+  theme_minimal()
+
+```
+
+### c.From the visualization alone, do you feel that media type makes a difference on intention to share?
+
+It feels like media type 4 has less mean intention to share than other 3 types of media sharing , since the the mean and distribution of type 4 significant distinct from other 3 in mean and distribution.
+
+### Question 2) Let’s try traditional one-way ANOVA:
+
+### a. State the null and alternative hypotheses when comparing INTEND.0 across four groups in ANOVA
+
+Null hypothesis (H0): There is no significant difference in the mean intention to share scores (INTEND.0) between the four media types.
+
+Alternative hypothesis (Ha): There is a significant difference in the mean intention to share scores (INTEND.0) between at least two media types.
+
+### b. Let’s compute the F-statistic ourselves:
+
+### 1. Show the code and results of computing MSTR, MSE, and F
+
+```{r}
+#overall mean 
+overall_mean <- mean(combined_data$INTEND.0, na.rm = TRUE)
+
+#mean for each media type 
+group_means <- combined_data %>% group_by(media_type) %>% summarise(group_mean = mean(INTEND.0, na.rm = TRUE))
+
+#Merge the group means back into the original data:
+combined_data_with_means <- merge(combined_data, group_means, by = "media_type")
+
+#Calculate the Sum of Squares for Treatments (SSTR) and Mean Sum of Squares for Treatments (MSTR):
+SSTR <- sum((combined_data_with_means$group_mean - overall_mean)^2)
+MSTR <- SSTR / (length(unique(combined_data$media_type)) - 1)
+
+#Calculate the Sum of Squares for Error (SSE) and Mean Sum of Squares for Error (MSE):
+SSE <- sum((combined_data_with_means$INTEND.0 - combined_data_with_means$group_mean)^2)
+MSE <- SSE / (nrow(combined_data) - length(unique(combined_data$media_type)))
+F_statistic <- MSTR / MSE
+# Compute the p-value of F, from the null F-distribution:
+df1 <- length(unique(combined_data$media_type)) - 1
+df2 <- nrow(combined_data) - length(unique(combined_data$media_type))
+p_value <- 1 - pf(F_statistic, df1, df2)
+
+
+# Print MSTR
+cat("MSTR:", MSTR, "\n")
+
+# Print MSE
+cat("MSE:", MSE, "\n")
+
+# Print F-statistic
+cat("F-statistic:", F_statistic, "\n")
+
+# Print p-value
+cat("p-value:", p_value, "\n")
+
+
+
+
+```
+
+The summary will show the Mean Sum of Squares for Treatments (MSTR), Mean Sum of Squares for Error (MSE), and the F-statistic.
+
+### 2. Compute the p-value of F, from the null F-distribution; is the F-value significant? 
+
+```{r}
+# Extract p-value
+print(p_value)
+
+```
+If the p-value is less than the significance level (e.g., 0.05), it indicates that the F-value is significant, and we reject the null hypothesis in favor of the alternative hypothesis. This means there is a significant difference in the mean intention to share scores (INTEND.0) between at least two media types.
+
+### If so, state your conclusion for the hypotheses.
+
+Since 0.05289015 is higher than significance level, we conclude that the F-value is not significant.
+
+and we cannot reject the null hypothesis in favor of the alternative hypothesis. This means there is no significant difference in the mean intention to share scores (INTEND.0) between at least two media types.
+
+### c. Conduct the same one-way ANOVA using the aov() function in R – confirm that you got similar results.
+
+```{r}
+# One-way ANOVA
+anova_results <- aov(INTEND.0 ~ media_type, data = combined_data)
+summary(anova_results)
+
+```
+
+
+### d.  Regardless of your conclusions, conduct a post-hoc Tukey test (feel free to use the TukeyHSD() function included in base R) to see if any pairs of media have significantly different means – what do you find?
+
+```{r}
+# Tukey post-hoc test
+tukey_results <- TukeyHSD(anova_results)
+print(tukey_results)
+
+```
+It turns out that the type 4 - Webpage (Text Only)- and type 2 - Video (Pictures + Audio)   might closely to be reject (there mean are not the same ) due to their p-value = 0.0573229, close to the significant alpha (e.g 0.05)
+
+
+### e. Do you feel the classic requirements of one-way ANOVA were met?
+
+To test the assumptions that need to be met for one-way ANOVA:
+
+1. Independence: Observations within each group should be independent of each other.
+
+ **Independence: This assumption is usually met by the study design. In   this case, the researcher randomly assigned people to different groups, which should ensure independence.**
+
+2. Normality: The response variable (INTEND.0) should be approximately normally distributed within each group.
+
+```{r}
+## QQ plot for checking Normality
+ggplot(combined_data, aes(sample = INTEND.0)) +
+  geom_qq() +
+  geom_qq_line() +
+  facet_wrap(~ media_type) +
+  theme_minimal() +
+  labs(title = "Q-Q Plots for Intention to Share by Media Type")
+
+```
+
+
+
+
+**We can see most of them meet Normality !**
+
+3.Homogeneity of variance: The variances of the response variable should be approximately equal across groups.
+
+**To check if these assumptions are met, you can perform the following tests and visualizations:**
+
+```{r}
+#  perform Levene's test to check for equal variances:
+leveneTest(INTEND.0 ~ media_type, data = combined_data)
+
+```
+Since the p-value from Levene's test is greater than the chosen significance level (e.g., 0.05), we can assume that the variances are equal across groups.
+
+
+### Question 3) Let’s use the non-parametric Kruskal Wallis test:
+
+### a. State the null and alternative hypotheses
+
+Null hypothesis (H0): There is no significant difference in the distribution of intention to share scores (INTEND.0) between the four media types.
+
+Alternative hypothesis (Ha): There is a significant difference in the distribution of intention to share scores (INTEND.0) between at least two media types.
+
+### b. Let’s compute (an approximate) Kruskal Wallis H ourselves (use the formula we saw in class or another formula might have found at a reputable website/book):
+
+### 1. Show the code and results of computing H
+
+Let's compute (an approximate) Kruskal Wallis H ourselves:
+
+```{r}
+# Rank the data
+ranked_data <- combined_data %>% mutate(rank = rank(INTEND.0))
+
+# Calculate the sum of ranks for each group
+sum_of_ranks <- ranked_data %>% group_by(media_type) %>% summarise(sum_rank = sum(rank))
+
+# Calculate the number of observations in each group
+group_sizes <- ranked_data %>% group_by(media_type) %>% summarise(group_size = n())
+
+# Compute H
+n_total <- nrow(ranked_data)
+H <- (12 / (n_total * (n_total + 1))) * sum(((sum_of_ranks$sum_rank)^2) / group_sizes$group_size) - 3 * (n_total + 1)
+
+cat("H-Statistics:", H, "\n")
+```
+
+### 2. Compute the p-value of H, from the null chi-square distribution; is the H value significant?If so, state your conclusion of the hypotheses.
+```{r}
+# Calculate degrees of freedom
+df <- length(unique(ranked_data$media_type)) - 1
+
+# Compute the p-value
+p_value <- 1 - pchisq(H, df)
+
+cat("p-value:", p_value, "\n")
+```
+Check if the H value is significant:
+
+The p-value is less than the significance level, it indicates that the H value is significant, and we can reject the null hypothesis in favor of the alternative hypothesis. This means there is a significant difference in the distribution of intention to share scores (INTEND.0) between at least two media types.
+
+### c. Conduct the same test using the kruskal.wallis() function in R – confirm that you got similar results.
+
+```{r}
+# Kruskal-Wallis test
+kruskal_test <- kruskal.test(INTEND.0 ~ media_type, data = combined_data)
+print(kruskal_test)
+```
+Compare the H and p-value to previous answer, we can see they are similar.
+
+### d. Regardless of your conclusions, conduct a post-hoc Dunn test (feel free to use the dunnTest() function from the FSA package) to see if the values of any pairs of media are significantly different – what are your conclusions?
+```{r}
+# Dunn post-hoc test
+dunn_test <- dunnTest(INTEND.0 ~ media_type, data = combined_data, method = "bonferroni")
+print(dunn_test)
+```
+Looking at the adjusted p-values (P.adj), we can see that only the comparison between media type 2 (Video with Pictures + Audio) and media type 4 (Webpage with Text Only) has a significant difference (p-value = 0.04742535) at a 95% confidence level.
+
+The other comparisons do not show significant differences between the intention to share scores for the respective media types, as their adjusted p-values are greater than 0.05.

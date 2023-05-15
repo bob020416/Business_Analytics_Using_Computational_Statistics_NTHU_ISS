@@ -1,0 +1,278 @@
+---
+title: "Homework13_BACS"
+author: "109090035"
+date: "5/10/2023"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      comment = "", 
+                      dev.args = list(                                       pointsize = 11))
+library(readxl)
+library(FSA)
+library(car)
+library(skimr)
+library(psych)
+library(kableExtra)
+library(tidyverse)
+library(dplyr)
+library(magrittr)
+library(Ecdat)
+library(gapminder)
+library(nycflights13)
+
+ptable = function(df,digits = getOption("digits"),size = 14){
+  df %>% knitr::kable(digits = digits) %>% 
+    kable_classic(lightable_options = c("striped", "hover", "condensed"),
+                  fixed_thead = list(enabled = T, 
+                                     background = "lavender"),
+                  font_size = size, full_width = F,
+                  html_font = "helvetica")
+}
+```
+
+###  Question 1) Let’s revisit the issue of multicollinearity of main effects (between cylinders, displacement, horsepower, and weight) we saw in the cars dataset, and try to apply principal components to it. Start by recreating the cars_log dataset, which log-transforms all variables except model year and origin.
+### Important: remove any rows that have missing values.
+
+```{r}
+library(dplyr)
+# load the car dataset 
+cars <- read.table("/Users/user/Downloads/auto-data.txt", header=FALSE, na.strings = "?")
+
+names(cars) <- c("mpg", "cylinders", "displacement", "horsepower", "weight", "acceleration", "model_year", "origin","model")
+
+# Remove rows with missing values
+cars <- cars[complete.cases(cars), ]
+
+# Apply log transformation
+cars_log <- cars %>%
+  mutate_at(vars(mpg, cylinders, displacement, horsepower, weight,acceleration), log)
+
+# Check the result
+head(cars_log)
+```
+
+### a. Let’s analyze the principal components of the four collinear variables
+
+### i. Create a new data.frame of the four log-transformed variables with high multicollinearity(Give this smaller data frame an appropriate name – what might they jointly mean?)
+
+```{r}
+# Assuming 'cars_log' is your original data frame
+df_collinear <- cars_log[, c("cylinders", "displacement", "horsepower", "weight")]
+head(df_collinear)
+```
+
+All variables are interrelated, as they all contribute to a car's overall performance and efficiency.
+
+### ii. How much variance of the four variables is explained by their first principal component?(a summary of the prcomp() shows it, but try computing this from the eigenvalues alone)
+
+```{r}
+# Compute the principal components
+pca <- prcomp(df_collinear, center = TRUE, scale. = TRUE)
+
+# Compute the proportion of variance explained by the first principal component
+explained_variance <- summary(pca)$importance[2, 1]
+
+print(paste("The first principal component explains", round(explained_variance*100, 2), "% of the variance."))
+
+```
+
+### iii. Looking at the values and valence (positiveness/negativeness) of the first principal component’s eigenvector, what would you call the information captured by this component?(i.e., think what concept the first principal component captures or represents)
+
+```{r}
+# Get the eigenvectors (loadings)
+loadings <- pca$rotation
+
+# Print the loadings of the first principal component
+print(loadings[, 1])
+
+
+```
+
+All the values are negative and roughly of equal magnitude. This suggests that the first principal component might represent a concept where all these variables decrease together.
+
+Given that these variables are all related to the power and size of the car (i.e., the number of cylinders, the engine displacement, the horsepower, and the weight), this principal component could potentially capture something like "inverse of power and size" of the cars, since a higher value of the component corresponds to lower values of all these variables.
+
+This is just a rough interpretation based on the information provided.
+
+### b. Let’s revisit our regression analysis on cars_log:
+
+### i. Store the scores of the first principal component as a new column of cars_log cars_log$new_column_name <- ...scores of PC1… Give this new column a name suitable for what it captures (see 1.a.i.)
+
+```{r}
+# Assuming your PCA object is named 'pca'
+cars_log$Power_Size_PC1 <- pca$x[,1] 
+head(cars_log)
+```
+
+### ii. Regress mpg over the column with PC1 scores (replacing cylinders, displacement, horsepower, and weight), as well as acceleration, model_year and origin
+
+```{r}
+model <- lm(mpg ~ Power_Size_PC1 + acceleration + model_year + origin, data = cars_log)
+summary(model)
+```
+
+### iii. Try running the regression again over the same independent variables, but this time with everything standardized. How important is this new column relative to other columns?
+
+```{r}
+# Standardizing variables
+cars_log$Power_Size_PC1_std <- scale(cars_log$Power_Size_PC1)
+cars_log$acceleration_std <- scale(cars_log$acceleration)
+cars_log$model_year_std <- scale(cars_log$model_year)
+cars_log$origin_std <- scale(cars_log$origin)
+
+# Running the regression again
+model_std <- lm(mpg ~ Power_Size_PC1_std + acceleration_std + model_year_std + origin_std, data = cars_log)
+summary(model_std)
+
+```
+
+The new column, Power_Size_PC1_std, has a coefficient estimate of 0.278990 and a t-value of 29.786, which is highly statistically significant (p < 2e-16).
+
+This suggests that Power_Size_PC1_std, which encapsulates the combined effect of the four original, highly-collinear variables (cylinders, displacement, horsepower, and weight), is a significant predictor of miles per gallon (mpg).
+
+The t-value can give us an idea of the relative importance of each predictor. The larger the absolute value of the t-value, the more "important" the predictor is in contributing to the response variable variation. Here, Power_Size_PC1_std has the second largest t-value, surpassed only by the intercept, indicating that it is an important predictor.
+
+### Question 2) Please download the Excel data file security_questions.xlsx from Canvas. In your analysis, you can either try to read the data sheet from the Excel file directly from R (there might be a package for that!) or you can try to export the data sheet to a CSV file before reading it into R.
+
+```{r}
+questions <- read_excel("/Users/user/Downloads/security_questions.xlsx", sheet = 1)
+data <- read_excel("/Users/user/Downloads/security_questions.xlsx", sheet = 2)
+
+head(questions)
+head(data)
+```
+
+### A group of researchers is studying how customers who shopped on e-commerce websites over the winter holiday season perceived the security of their most recently used e-commerce site. Based on feedback from experts, the company has created eighteen questions (see ‘questions’ tab of excel file) regarding security considerations at e-commerce websites. Over 400 customers responded to these questions (see ‘data’ tab of Excel file). The researchers now wants to use the results of these eighteen questions to reveal if there are some underlying dimensions of people’s perception of online security that effectively capture the variance of these eighteen questions. Let’s analyze the principal components of the eighteen items.
+
+
+### a. How much variance did each extracted factor explain?
+
+```{r}
+# Run PCA on the data
+pca_result <- prcomp(data, center = TRUE, scale. = TRUE)
+
+# Print summary of the PCA result
+print(summary(pca_result))
+
+```
+In the summary, the "Proportion of Variance" row shows how much variance each principal component explains.
+
+
+### b. How many dimensions would you retain, according to the two criteria we discussed?(Eigenvalue ≥ 1 and Scree Plot – can you show the screeplot with eigenvalue=1 threshhold?)
+
+```{r}
+# Scree plot
+plot(pca_result$sdev^2, type = "b", main = "Scree Plot",
+     xlab = "Principal Component", ylab = "Eigenvalue")
+abline(h = 1, lty = 2, col = "red")  # Add a horizontal line at y = 1
+
+```
+
+We can visualize this using a scree plot, where we plot the eigenvalues in decreasing order:
+
+The point where the plot bends sharply (the "elbow") is often used as a cutoff: components to the left of the elbow are retained, and components to the right are discarded.
+
+### c. (ungraded) Can you interpret what any of the principal components mean? Try guessing the meaning of the first two or three PCs looking at the PC-vs-variable matrix
+
+```{r}
+# Print the loadings of the first three components
+print(pca_result$rotation[, 1:3])
+
+```
+
+The loadings can be interpreted as the correlations between the original variables and the principal components.
+
+Looking at the loadings, we can make some interpretations about the components:
+
+PC1: All the variables have negative loadings on the first principal component, which means that PC1 might represent a general tendency across all the questions. This could be a general level of comfort or perceived security with online shopping, with high scores indicating low comfort or perceived security.
+
+PC2: The loadings on the second principal component are mixed. Variables Q4, Q12 and Q17 have notably high negative loadings on this component, suggesting that these questions might be capturing a different aspect of perceived security that is in some way opposed to the aspects captured by the other questions.
+
+PC3: The loadings on the third principal component are also mixed. Variables Q5, Q8, Q10 and Q15 have high negative loadings, while Q7 has a positive loading. This suggests that these questions might be capturing yet another aspect of perceived security, separate from those captured by PC1 and PC2.
+
+### Question 3) Let’s simulate how principal components behave interactively: run the interactive_pca() function from the compstatslib package we have used earlier:
+
+### a. Create an oval shaped scatter plot of points that stretches in two directions – you should find that the principal component vectors point in the major and minor directions of variance (dispersion). Show this visualization.
+
+When we perform PCA on this data, the first principal component (PC1) will be a line that goes through the center of the cloud of points along the direction where the data varies the most. This is the long axis of the oval. The second principal component (PC2) will be a line perpendicular to PC1, going through the center of the data along the direction of the second-most variance. This will be along the short axis of the oval.
+
+In R, the PCA plot might show the vectors (arrows) for PC1 and PC2 superimposed on the scatterplot of the data. PC1 will be a longer vector (since it explains more of the variance), and PC2 will be shorter.
+
+```{r}
+# Create correlated data
+set.seed(1)
+x <- rnorm(100)
+y <- 1.5 * x + rnorm(100)
+
+# Combine the data into a data frame
+df <- data.frame(x = x, y = y)
+
+# Perform PCA
+pca <- prcomp(df)
+
+# Create a scatter plot
+ggplot(df, aes(x, y)) +
+  geom_point() +
+  coord_fixed() +
+  geom_segment(aes(x = 0, y = 0, xend = pca$rotation[1, 1], yend = pca$rotation[2, 1]),
+               arrow = arrow(length = unit(0.3, "cm")), 
+               color = "red", 
+               linetype = "dashed") +
+  geom_segment(aes(x = 0, y = 0, xend = pca$rotation[1, 2], yend = pca$rotation[2, 2]),
+               arrow = arrow(length = unit(0.3, "cm")), 
+               color = "blue", 
+               linetype = "dashed") +
+  ggtitle("PCA plot")
+
+```
+
+```{r}
+# Load the necessary package
+library(compstatslib)
+# Run the interactive_pca function
+# using interactive_pca()
+```
+
+![Image description](/Users/user/Downloads/question3_a.png)
+
+
+
+
+### b. Can you create a scatterplot whose principal component vectors do NOT seem to match the major directions of variance? Show this visualization.
+
+we generate data where y is a noisy version of x, so the major direction of variance should be along the line y=x. However, we then add an outlier at (10, 10). As PCA is sensitive to outliers, this will pull one of the principal component vectors towards the outlier, making it appear as though the principal component vectors do not match the major directions of variance in the original data.
+
+
+```{r}
+# Simulate data
+set.seed(42)
+x <- rnorm(100)
+y <- x + rnorm(100, sd = 0.1)
+df <- data.frame(x = x, y = y)
+
+# Add an outlier
+df <- rbind(df, c(10, 10))
+
+# PCA
+pca <- prcomp(df)
+
+# Scatter plot
+plot(df, xlab = "X", ylab = "Y", main = "Scatter plot with PCA Vectors", xlim = c(-3, 11), ylim = c(-3, 11))
+
+# Add principal component vectors
+arrows(0, 0, pca$rotation[1, 1] * 3, pca$rotation[2, 1] * 3, col = "red", lwd = 2)
+arrows(0, 0, pca$rotation[1, 2] * 3, pca$rotation[2, 2] * 3, col = "blue", lwd = 2)
+
+```
+
+```{r}
+# Load the necessary package
+library(compstatslib)
+# Run the interactive_pca function
+# using interactive_pca()
+```
+
+![Image description](/Users/user/Downloads/question3_b.png)
